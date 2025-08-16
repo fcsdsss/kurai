@@ -7,14 +7,14 @@
 ## example 暗い
 ```lua
 loadstring(
-    game:HttpGetAsync 'https://raw.githubusercontent.com/focat69/kurai/refs/heads/main/example.lua'
+    game:HttpGetAsync 'https://raw.githubusercontent.com/fcsdsss/kurai/refs/heads/main/example.lua'
 )()
 ```
 
 ## installation 暗い
 ```lua
 local lib = loadstring(
-    game:HttpGetAsync `https://raw.githubusercontent.com/focat69/kurai/refs/heads/main/source?t={tostring(tick())}`
+    game:HttpGetAsync `https://raw.githubusercontent.com/fcsdsss/kurai/refs/heads/main/source?t={tostring(tick())}`
 )()
 ```
 
@@ -248,3 +248,4 @@ local username = lib.Flags.username_flag
 > i've spent countless hours on this and i wouldnt want my hard work to be skidded without permission  
 > please respect my work and do not skid this library without my permission  
 > if approved by me, remember to give credits where its due!
+
