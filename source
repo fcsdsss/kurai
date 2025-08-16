@@ -41,7 +41,7 @@ function Kurai_Lib.Tween(obj, goal, time, style, direction)
     return tween
 end
 
-function Kurai_Lib.RippleEffect(btnInstance, color)
+function Kurai_Lib.RippleEffect(btnInstance, color, inputObject)
     local ripple = Instance.new("Frame")
     ripple.Name = "Ripple"
     ripple.BackgroundColor3 = color or Kurai_Lib.Theme.Accent
@@ -54,10 +54,16 @@ function Kurai_Lib.RippleEffect(btnInstance, color)
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = ripple
     
-    local mouse = UserInputService:GetMouseLocation()
+    local inputPos
+    if inputObject and inputObject.Position then
+        inputPos = inputObject.Position
+    else
+        inputPos = UserInputService:GetMouseLocation()
+    end
+    
     local buttonPos = btnInstance.AbsolutePosition
-    local relativeX = mouse.X - buttonPos.X
-    local relativeY = mouse.Y - buttonPos.Y
+    local relativeX = inputPos.X - buttonPos.X
+    local relativeY = inputPos.Y - buttonPos.Y
     
     ripple.Position = UDim2.new(0, relativeX, 0, relativeY)
     ripple.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -104,14 +110,14 @@ function Kurai_Lib:ToggleUI()
         self.MainWindow.Visible = true
         self.MainWindow.BackgroundTransparency = 1
 
-        local startPos = UDim2.new(
-            self.MainWindow.Position.X.Scale, 
-            self.MainWindow.Position.X.Offset,
-            1, 500
-        )
         local targetPos = UDim2.new(
             0.5, -self.MainWindow.AbsoluteSize.X/2,
             0.5, -self.MainWindow.AbsoluteSize.Y/2
+        )
+         local startPos = UDim2.new(
+            targetPos.X.Scale, 
+            targetPos.X.Offset,
+            1, 50
         )
         self.MainWindow.Position = startPos
         
@@ -119,6 +125,7 @@ function Kurai_Lib:ToggleUI()
             Position = targetPos,
             BackgroundTransparency = 0
         })
+        task.wait(0.5)
         Kurai_Lib.Settings.TogglingUI = false
     else
         local currentPos = self.MainWindow.Position
@@ -126,7 +133,7 @@ function Kurai_Lib:ToggleUI()
         local targetPos = UDim2.new(
             currentPos.X.Scale, 
             currentPos.X.Offset,
-            1, 500
+            1, 50
         )
         
         Kurai_Lib.Tween(self.MainWindow, {
@@ -491,28 +498,39 @@ function Kurai_Lib:SetToggleKeybind(keyCode)
 end
 
 function Kurai_Lib:Draggable(frame, handle)
-    local dragStartPos, frameStartPos
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragStartPos = input.Position
-            frameStartPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragStartPos = nil
-                end
-            end)
-        end
-    end)
-    
-    handle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and dragStartPos then
-            local delta = input.Position - dragStartPos
-            frame.Position = UDim2.new(
-                frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X,
-                frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
-            )
-        end
-    end)
+	local dragging = false
+	local dragInput = nil
+	local dragStart = nil
+	local startPos = nil
+
+	local function update(input)
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+
+			local connection
+			connection = input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+					connection:Disconnect()
+				end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if dragging and input.UserInputState ~= Enum.UserInputState.End then
+				update(input)
+			end
+		end
+	end)
 end
 
 function Kurai_Lib:InitTabs(tabNames)
@@ -668,10 +686,12 @@ function Kurai_Lib:_createButton(tabName, props, flag)
         Kurai_Lib.Tween(btnInstance, {BackgroundColor3 = Kurai_Lib.Theme.Tab})
     end)
     
-    btnInstance.MouseButton1Click:Connect(function()
-        Kurai_Lib.RippleEffect(btnInstance)
-        if props.Callback then
-            props.Callback(btnInstance)
+    btnInstance.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Kurai_Lib.RippleEffect(btnInstance, nil, input)
+            if props.Callback then
+                task.spawn(props.Callback, btnInstance)
+            end
         end
     end)
     
@@ -875,20 +895,20 @@ function Kurai_Lib:_createSlider(tabName, props, flag)
     end
     
     track.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             sliding = true
             updateValueFromInput(input)
         end
     end)
     
-    track.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             sliding = false
         end
     end)
     
     UserInputService.InputChanged:Connect(function(input)
-        if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             updateValueFromInput(input)
         end
     end)
@@ -1409,7 +1429,7 @@ function Kurai_Lib:_createKeybind(tabName, props, flag)
         [Enum.KeyCode.RightBracket] = "]",
         [Enum.KeyCode.Semicolon] = ";",
         [Enum.KeyCode.Quote] = "'",
-        [Enum.KeyCode.BackSlash] = "\\",
+        [Enum.KeyCode.Backslash] = "\\",
         [Enum.KeyCode.Comma] = ",",
         [Enum.KeyCode.Period] = ".",
         [Enum.KeyCode.Slash] = "/",
@@ -1560,7 +1580,7 @@ function Kurai_Lib:_createKeybind(tabName, props, flag)
                     props.Callback(selectedKey, keybind)
                 end
             end
-        elseif not gpe and input.KeyCode == selectedKey or input.UserInputType == selectedKey then
+        elseif not gpe and (input.KeyCode == selectedKey or input.UserInputType == selectedKey) then
             if props.OnPressed then
                 props.OnPressed(selectedKey, keybind)
             end
@@ -1712,7 +1732,7 @@ function Kurai_Lib:_createTextField(tabName, props, flag)
                 
                 local parts = string.split(newText, ".")
                 if #parts > 2 then
-                    newText = parts[1] .. "." .. parts[2]
+                    newText = parts[1] .. "." .. table.concat(parts, "", 2)
                 end
             elseif props.InputType == "integer" then -- whole only
                 newText = text:gsub("[^%d]", "")
